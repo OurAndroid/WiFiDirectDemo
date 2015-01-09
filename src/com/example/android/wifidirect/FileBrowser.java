@@ -12,13 +12,8 @@ import java.util.TreeSet;
 import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.media.ThumbnailUtils;
-import android.net.Uri;
 import android.os.Bundle;
 import android.util.Log;
-import android.view.Menu;
-import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
@@ -29,6 +24,8 @@ import android.widget.ListView;
 import android.widget.SimpleAdapter;
 import android.widget.SimpleAdapter.ViewBinder;
 import android.widget.TextView;
+
+import com.example.filebrowser.utils.ImageWorker;
 
 
 
@@ -43,11 +40,15 @@ public class FileBrowser extends Activity {
    TextView textView;
    Button button;
    
+   ImageWorker imageWorker;
+   
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.filebrowser);
 		
+		imageWorker = new ImageWorker(this);
+		imageWorker.setLoadingImage(R.drawable.empty_photo);
 		
 		listView = (ListView) findViewById(R.id.list);
 		textView = (TextView) findViewById(R.id.text);
@@ -153,7 +154,7 @@ public class FileBrowser extends Activity {
 	private File[] orderFiles(File[] currentFiles){
 		List<File> files = new ArrayList<File>();
 		List<File> dirFiles = new ArrayList<File>();
-		//�ж�currentFiles�Ƿ�Ϊ��
+		//对文件排序
 		if(currentFiles==null){
 			return currentFiles;
 		}else{
@@ -201,10 +202,10 @@ public class FileBrowser extends Activity {
 				map.put("icon", R.drawable.wenjianjia);
 			else if(name.contains(".jpg")||name.contains(".png")){
 				
-				//String imagePath = file.getAbsolutePath();
+				String imagePath = file.getAbsolutePath();
 				Bitmap bitmap;
 				
-				bitmap = ThumbnailUtils.extractThumbnail(BitmapFactory.decodeFile(file.getAbsolutePath()), 80, 80);
+				//bitmap = ThumbnailUtils.extractThumbnail(BitmapFactory.decodeFile(file.getAbsolutePath()), 80, 80);
 				/*BitmapFactory.Options options = new BitmapFactory.Options();
 				options.inJustDecodeBounds = true;
 				
@@ -231,8 +232,8 @@ public class FileBrowser extends Activity {
 				bitmap = BitmapFactory.decodeFile(file.getAbsolutePath(), options);
 				System.out.println("f_height"+height+"l_height"+bitmap.getHeight());
 				System.out.println("f_width"+width+"l_width"+bitmap.getWidth());*/
-				//map.put("icon", imagePath);
-				map.put("icon", bitmap);
+				map.put("icon", imagePath);
+				//map.put("icon", bitmap);
 				
 			}
 			else
@@ -274,9 +275,7 @@ public class FileBrowser extends Activity {
                      if (data instanceof Integer) {
                          ((ImageView) v).setImageResource((Integer) data);                            
                      }else if(data instanceof String){
-                    	 Bitmap bitmap = BitmapFactory.decodeFile((String)data);
-                    	 ((ImageView) v).setImageBitmap(ThumbnailUtils.extractThumbnail(bitmap, 80, 80));
-                    	 bitmap.recycle();
+                    	 imageWorker.loadImage(data, (ImageView)v);
                      }
                      else {
                          ((ImageView) v).setImageBitmap((Bitmap) data);
