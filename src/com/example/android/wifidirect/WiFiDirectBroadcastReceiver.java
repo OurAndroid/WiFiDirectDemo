@@ -96,12 +96,12 @@ public class WiFiDirectBroadcastReceiver extends BroadcastReceiver {
 
                 DeviceDetailFragment fragment = (DeviceDetailFragment) activity
                         .getFragmentManager().findFragmentById(R.id.frag_detail);
-                manager.requestConnectionInfo(channel, fragment);  //获取一个设备的连接信息
+                manager.requestConnectionInfo(channel, fragment);  //获取一个设备的连接信息，会调用onConnectionInfoAvailable方法
             } else {
                 // It's a disconnect
                 activity.resetData();
             }
-        } else if (WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION.equals(action)) {
+        } else if (WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION.equals(action)) {  //当设备的详细信息改变的时候进行广播，比如设备的名称
             DeviceListFragment fragment = (DeviceListFragment) activity.getFragmentManager()
                     .findFragmentById(R.id.frag_list);
             fragment.updateThisDevice((WifiP2pDevice) intent.getParcelableExtra(

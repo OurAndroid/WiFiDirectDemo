@@ -118,6 +118,17 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                         
                     }
                 });
+				
+		mContentView.findViewById(R.id.btn_start_server).setOnClickListener(
+		new View.OnClickListener(){
+			@Override 
+			public void onClick(View v){
+				new FileServerAsyncTask(getActivity(), mContentView.findViewById(R.id.status_text))
+                    .execute();		
+			
+			}
+		}
+		);
 
         return mContentView;
     }
@@ -144,7 +155,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         getActivity().startService(serviceIntent); 
         }
     }
-
+    // �����豸��
     @Override
     public void onConnectionInfoAvailable(final WifiP2pInfo info) {
         if (progressDialog != null && progressDialog.isShowing()) {
@@ -166,21 +177,23 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         // After the group negotiation, we assign the group owner as the file
         // server. The file server is single threaded, single connection server
         // socket.
-        if (info.groupFormed && info.isGroupOwner) {
+        /*if (info.groupFormed && info.isGroupOwner) {
             new FileServerAsyncTask(getActivity(), mContentView.findViewById(R.id.status_text))
                     .execute();
-        } else if (info.groupFormed) {
+        } else if (info.groupFormed) {        }*/
             // The other device acts as the client. In this case, we enable the
             // get file button.
             mContentView.findViewById(R.id.btn_start_client).setVisibility(View.VISIBLE);
             ((TextView) mContentView.findViewById(R.id.status_text)).setText(getResources()
                     .getString(R.string.client_text));
-        }
+
 
         // hide the connect button
         mContentView.findViewById(R.id.btn_connect).setVisibility(View.GONE);
     }
 
+	
+	
     /**
      * Updates the UI with device data
      * 
@@ -198,6 +211,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
 
     /**
      * Clears the UI fields after a disconnect or direct mode disable operation.
+	 ���UI
      */
     public void resetViews() {
         mContentView.findViewById(R.id.btn_connect).setVisibility(View.VISIBLE);
