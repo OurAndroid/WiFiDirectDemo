@@ -1,33 +1,50 @@
 package com.example.filebrowser.utils;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.lang.ref.WeakReference;
 import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.example.android.wifidirect.R;
+
+
+import android.annotation.TargetApi;
 import android.content.Context;
 import android.content.res.Resources;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
-import android.media.ThumbnailUtils;
 import android.os.AsyncTask;
+import android.os.Build;
 import android.util.Log;
 import android.widget.ImageView;
+
+
 
 public class ImageWorker {
 	
 	private static final String Tag = "ImageWorker";
 	
+	
+	private static int i=0;
 	private Bitmap mLoadingBitmap;
 	
-	private final int width = 80,height = 80;
+	private final int width,height;
+	
 	
 	protected Resources mResources;
 	
-	//ÐÂµÄÏß³Ì³Ø
+	//Í¼Æ¬ï¿½ï¿½ï¿½ï¿½
+	private static ImageCache mImageCache;
+	//private static LruCache<String,BitmapDrawable> mMemoryCache;
+	//ï¿½Âµï¿½ï¿½ß³Ì³ï¿½
 	private static final ThreadFactory  sThreadFactory = new ThreadFactory() {
 	        private final AtomicInteger mCount = new AtomicInteger(1);
 
@@ -41,7 +58,24 @@ public class ImageWorker {
 	
 	public ImageWorker(Context context){
 		mResources = context.getResources();
+		int maxMemory = (int) Runtime.getRuntime().maxMemory()/1024;
+		int cacheSize = Math.round(maxMemory*0.7f);
+		width = height = mResources.getDimensionPixelSize(R.dimen.image_size);
+		
+		Log.i("fl---ImageWorker", cacheSize+"");
+		mImageCache = new ImageCache(cacheSize);
 	}
+	
+	public void addBitmapToMemory(String key, BitmapDrawable bitmap){
+		if(getBitmapFromCache(key) == null){
+			mImageCache.addBitmapToMemCache(key, bitmap);
+		}
+	}
+	
+	public BitmapDrawable getBitmapFromCache(String key){
+		return mImageCache.getBitmapFromMemCache(key);
+	}
+	
 	
 	public void setLoadingImage(Bitmap bitmap){
 		mLoadingBitmap = bitmap;
@@ -56,50 +90,81 @@ public class ImageWorker {
 			return;
 		}
 		
-		//BitmapDrawable value = null;
-		//ÔÚÕâÀï²åÈë»º´æ
-		if(cancelPotentialWork(data, imageView)){//ÒÔÏÂÖØÐÂ´´½¨task£¬²¢°ó¶¨µ½imageView
+		BitmapDrawable bitmap = mImageCache.getBitmapFromMemCache((String)data);
+		if(bitmap != null){
+			imageView.setImageDrawable(bitmap);//BitmapDrawable value = null;
+		//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ë»ºï¿½ï¿½
+		}else if(cancelPotentialWork(data, imageView)){//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Â´ï¿½ï¿½ï¿½taskï¿½ï¿½ï¿½ï¿½ï¿½ó¶¨µï¿½imageView
 			final BitmapWorkerTask task = new BitmapWorkerTask(data, imageView);
 			final AsyncDrawable asyncDrawable = new AsyncDrawable(mResources, mLoadingBitmap, task);
 			
 			imageView.setImageDrawable(asyncDrawable);
 			
 			task.executeOnExecutor(this.DUAL_THREAD_EXECUTOR);
-			//task.execute();     //ÕâÀïµÄÄÚ²¿Ö´ÐÐË³Ðò
+			//task.execute();     //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ú²ï¿½Ö´ï¿½ï¿½Ë³ï¿½ï¿½
 		}
 	}
 	
+	
+	@TargetApi(Build.VERSION_CODES.KITKAT)
+	@SuppressWarnings("resource")
 	private Bitmap processBitmap(String filePath){
 		
 		BitmapFactory.Options options = new BitmapFactory.Options();
 		options.inJustDecodeBounds = true;
 		
 		Bitmap bitmap = BitmapFactory.decodeFile(filePath, options);
-		System.out.println(filePath);
 		
 		
-		int be = 0;
-		int height = options.outHeight;
-		int width = options.outWidth;
-		
-		if(height!=0&&width!=0){
-			
-			be =  (int) (height/(float)80+width/(float)80)/2;
-			 
-		}
 		options.inJustDecodeBounds = false;
 		
-		//be = (int) ((int)(height>width ? height:width)/(float)50);
-		if(be<=0)
-			be = 1;
-		options.inSampleSize = be;
+		Log.i("fl---processBitmap", filePath+"---"+i++);
+		options.inSampleSize = calculateSampleSize(options, height, width );
 		
-		bitmap = BitmapFactory.decodeFile(filePath, options);
+		//addInbitmap(options);//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ðµï¿½bitmapï¿½ï¿½Ô´ï¿½Ü·ï¿½ï¿½ï¿½ï¿½ï¿½
+		//bitmap = BitmapFactory.decodeFile(filePath, options);
+		FileInputStream fo = null;
+		try {
+			fo = new FileInputStream(filePath);
+			
+			if(fo!=null&&options.outHeight!=-1)
+			bitmap = BitmapFactory.decodeFileDescriptor(fo.getFD(),null,options);
+			fo.close();
+		} catch (FileNotFoundException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
+		if(bitmap!=null)
+		Log.i("fl_processbitmap", ""+bitmap.getAllocationByteCount());
+		
+		/*Bitmap scaledBitmap = Bitmap.createScaledBitmap(bitmap, width, height, false);
+		
+		//ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½ï¿½bitmap
+		if(scaledBitmap != bitmap){
+			bitmap.recycle();
+		}
 	
+		return scaledBitmap;*/
 		return bitmap;
 	}
 	
-	//ÅÐ¶Ïµ±Ç°imageViewÖÐÖ´ÐÐµÄÈÎÎñÊÇ·ñÎªÄ¿±êÈÎÎñ£¬Èç¹û²»ÊÇ£¬ÔòÇå³ý²¢·µ»Øtrue
+	public void addInbitmap(BitmapFactory.Options options){
+		
+		Log.i("fl---addInbitmap", "ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ï¿½ï¿½ï¿½Ü±ï¿½ï¿½ï¿½ï¿½Ãµï¿½bitmap");
+		options.inMutable = true;
+		Bitmap bitmap = mImageCache.getBitmapFromReuseableSet(options);
+		if(bitmap != null&&bitmap.getConfig() != null){
+			
+			options.inBitmap = bitmap;
+			Log.i("fl----addInbitmap", "bitMapï¿½ï¿½ï¿½ï¿½ï¿½ï¿½");
+		}
+	}
+	
+	//ï¿½Ð¶Ïµï¿½Ç°imageViewï¿½ï¿½Ö´ï¿½Ðµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç·ï¿½ÎªÄ¿ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ç£ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½true
 	public static boolean cancelPotentialWork(Object data, ImageView imageView){
 		final BitmapWorkerTask bitmapWorkerTask = getBitmapWorkerTask(imageView);
 		
@@ -107,10 +172,10 @@ public class ImageWorker {
 			final Object bitmapData = bitmapWorkerTask.mData;
 			
 			if(bitmapData ==null||!bitmapData.equals(data)){
-				bitmapWorkerTask.cancel(true);//ÕâÀïµÄcancelÔÚ¶Ô¶ÁÈ¡Í¼Æ¬µÄIO²Ù×÷Ê±£¬²»Ò»¶¨ÄÜÈ¡Ïû
-				Log.i("fl","cancelPotentialWorkÇ°ºó²»µÈ");
+				bitmapWorkerTask.cancel(true);//ï¿½ï¿½ï¿½ï¿½ï¿½cancelï¿½Ú¶Ô¶ï¿½È¡Í¼Æ¬ï¿½ï¿½IOï¿½ï¿½ï¿½ï¿½Ê±ï¿½ï¿½ï¿½ï¿½Ò»ï¿½ï¿½ï¿½ï¿½È¡ï¿½ï¿½
+				Log.i("fl","cancelPotentialWorkÇ°ï¿½ó²»µï¿½");
 			}else{
-				Log.i("fl","³öÏÖÇ°ºóÏàµÈ");
+				Log.i("fl","ï¿½ï¿½ï¿½ï¿½Ç°ï¿½ï¿½ï¿½ï¿½ï¿½");
 				return false;
 			}
 			
@@ -148,7 +213,7 @@ public class ImageWorker {
 			if(bitmap!=null){
 				drawable = new BitmapDrawable(mResources, bitmap);
 			}
-			
+			mImageCache.addBitmapToMemCache(filePath, drawable);
 			
 			return drawable;
 		}
@@ -157,9 +222,9 @@ public class ImageWorker {
 		protected void onPostExecute(BitmapDrawable value) {
 			// TODO Auto-generated method stub
 			
-			final ImageView imageView = getAttachedImageView();  //ÕâÀïÔÙÖ´ÐÐÒ»´Î¼ì²â£¬Èç¹û¸Ã½ø³ÌÒÑ¹ýÆÚµ«Î´ÄÜÈ¡Ïû³É¹¦£¬Ôò²»ÏÔÊ¾Í¼Æ¬
+			final ImageView imageView = getAttachedImageView();  //ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ö´ï¿½ï¿½Ò»ï¿½Î¼ï¿½â£¬ï¿½ï¿½ï¿½Ã½ï¿½ï¿½ï¿½Ñ¹ï¿½ï¿½Úµï¿½Î´ï¿½ï¿½È¡ï¿½ï¿½É¹ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¾Í¼Æ¬
 			if(value!=null&&imageView!=null){
-			
+			    
 				imageView.setImageDrawable(value);
 			}
 		}
@@ -181,6 +246,37 @@ public class ImageWorker {
 		
 		
 	}
+	
+	//ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ê¾Í¼Æ¬ï¿½Ä´ï¿½Ð¡
+	public static int calculateSampleSize(BitmapFactory.Options options, int reqWidth, int reqHeight){
+		final int height = options.outHeight;
+		final int width = options.outWidth;
+		int sampleSize = 1;
+		
+		final int halfHeight = height/2;
+		final int halfWidth = width/2;
+		if(halfHeight>reqHeight || halfWidth>reqWidth){
+			sampleSize*=2;
+		}
+		
+		while((halfHeight / sampleSize > reqHeight) && 
+				(halfWidth/sampleSize>reqWidth)){
+			sampleSize *=2;
+		}
+		
+		Log.i("fl_calculatesize", "req"+reqHeight+"  "+reqWidth);
+		Log.i("fl_calculateSize", height/sampleSize+"||"+width/sampleSize+"||size "+sampleSize+"---"+i);
+		
+		/*long totalPixal = height * width /sampleSize;
+		long totalreqPixal = reqHeight * reqWidth *2;
+		
+		while(totalPixal> totalreqPixal){
+			sampleSize *= 2;
+			totalPixal /= 2;
+		}*/
+		return sampleSize;
+	}
+	
 	
 	private static class AsyncDrawable extends BitmapDrawable{
 		private final WeakReference<BitmapWorkerTask> bitmapWorkerTaskReference;

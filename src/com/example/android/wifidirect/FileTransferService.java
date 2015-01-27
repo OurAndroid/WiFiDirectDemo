@@ -2,19 +2,19 @@
 
 package com.example.android.wifidirect;
 
-import android.app.IntentService;
-import android.content.ContentResolver;
-import android.content.Context;
-import android.content.Intent;
-import android.net.Uri;
-import android.util.Log;
-
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+
+import android.app.IntentService;
+import android.content.Context;
+import android.content.Intent;
+import android.util.Log;
 
 /**
  * A service that process each file transfer request i.e Intent by opening a
@@ -37,7 +37,7 @@ public class FileTransferService extends IntentService {
     }
 
     /*
-     * (non-Javadoc)
+     * (non-Javadoc)打开soket，并将文件读入soket输入流，传递给远程主机
      * @see android.app.IntentService#onHandleIntent(android.content.Intent)
      */
     @Override
@@ -57,10 +57,12 @@ public class FileTransferService extends IntentService {
 
                 Log.d(WiFiDirectActivity.TAG, "Client socket - " + socket.isConnected());
                 OutputStream stream = socket.getOutputStream();
-                ContentResolver cr = context.getContentResolver();
+               // ContentResolver cr = context.getContentResolver();
+                File file = new File(fileUri);
                 InputStream is = null;
                 try {
-                    is = cr.openInputStream(Uri.parse(fileUri));
+                	is = new FileInputStream(file);
+                   // is = cr.openInputStream(Uri.parse(fileUri));
                 } catch (FileNotFoundException e) {
                     Log.d(WiFiDirectActivity.TAG, e.toString());
                 }

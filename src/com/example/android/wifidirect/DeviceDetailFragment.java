@@ -73,7 +73,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
             @Override
             public void onClick(View v) {
                 WifiP2pConfig config = new WifiP2pConfig();
-                config.deviceAddress = device.deviceAddress;
+                config.deviceAddress = device.deviceAddress;     //这里可能有问题
                 config.wps.setup = WpsInfo.PBC;
                 if (progressDialog != null && progressDialog.isShowing()) {
                     progressDialog.dismiss();
