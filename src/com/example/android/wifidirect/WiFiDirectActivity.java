@@ -16,13 +16,18 @@
 
 package com.example.android.wifidirect;
 
+import java.lang.reflect.InvocationTargetException;
+import java.lang.reflect.Method;
+
 import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.net.wifi.WifiManager;
 import android.net.wifi.p2p.WifiP2pConfig;
 import android.net.wifi.p2p.WifiP2pDevice;
+import android.net.wifi.p2p.WifiP2pGroup;
 import android.net.wifi.p2p.WifiP2pManager;
 import android.net.wifi.p2p.WifiP2pManager.ActionListener;
 import android.net.wifi.p2p.WifiP2pManager.Channel;
@@ -71,13 +76,13 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
         // add necessary intent values to be matched.
 
         intentFilter.addAction(WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION);
-      //±íÊ¾Wi-Fi¶ÔµÈÍøÂç×´Ì¬·¢ÉúÁË¸Ä±ä  
+      //ï¿½ï¿½Ê¾Wi-Fiï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½Ë¸Ä±ï¿½  
         intentFilter.addAction(WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION);
-      //±íÊ¾¿ÉÓÃµÄ¶ÔµÈµãµÄÁĞ±í·¢ÉúÁË¸Ä±ä
+      //ï¿½ï¿½Ê¾ï¿½ï¿½ï¿½ÃµÄ¶ÔµÈµï¿½ï¿½ï¿½Ğ±?ï¿½ï¿½ï¿½Ë¸Ä±ï¿½
         intentFilter.addAction(WifiP2pManager.WIFI_P2P_CONNECTION_CHANGED_ACTION);
-      //±íÊ¾Wi-Fi¶ÔµÈÍøÂçµÄÁ¬½Ó×´Ì¬·¢ÉúÁË¸Ä±ä 
+      //ï¿½ï¿½Ê¾Wi-Fiï¿½Ôµï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½×´Ì¬ï¿½ï¿½ï¿½ï¿½ï¿½Ë¸Ä±ï¿½ 
         intentFilter.addAction(WifiP2pManager.WIFI_P2P_THIS_DEVICE_CHANGED_ACTION);
-      //Éè±¸ÅäÖÃĞÅÏ¢·¢ÉúÁË¸Ä±ä 
+      //ï¿½è±¸ï¿½ï¿½ï¿½ï¿½ï¿½ï¿½Ï¢ï¿½ï¿½ï¿½ï¿½ï¿½Ë¸Ä±ï¿½ 
         manager = (WifiP2pManager) getSystemService(Context.WIFI_P2P_SERVICE);
         channel = manager.initialize(this, getMainLooper(), null);
     }
@@ -179,11 +184,32 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
 
     @Override
     public void connect(WifiP2pConfig config) {
+    	final String address = config.deviceAddress;  //å†…éƒ¨ç±»ä¸­ä½¿ç”¨è¦æ˜¯finalç±»å‹ï¼Ÿ
+    	
+    	//åˆ é™¤å·²ç»å­˜åœ¨çš„åˆ†ç»„ä¿¡æ¯
+    	removeAndDeleteGroup();
+    	//åˆ›å»ºgroupç»„
+    	manager.createGroup(channel, new ActionListener(){
+
+			@Override
+			public void onSuccess() {
+				// TODO Auto-generated method stub
+				Log.i(TAG, "åˆ›å»ºp2pç»„");
+			}
+
+			@Override
+			public void onFailure(int reason) {
+				// TODO Auto-generated method stub
+				Log.i(TAG, "åˆ›å»ºå¤±è´¥");
+			}
+    		
+    	});
         manager.connect(channel, config, new ActionListener() {
 
             @Override
             public void onSuccess() {
                 // WiFiDirectBroadcastReceiver will notify us. Ignore for now.
+            	Log.i(TAG, "ç»„é•¿æ˜¯"+address);
             }
 
             @Override
@@ -213,6 +239,8 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
             }
 
         });
+        
+        removeAndDeleteGroup();
     }
 
     @Override
@@ -265,5 +293,26 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
             }
         }
 
+    }
+    
+    private void removeAndDeleteGroup(){
+    	try {
+			Method deletePersistentGroup = WifiP2pManager.class.getMethod("deletePersistentGroup");
+			for(int netid=0; netid<32; netid++){
+				deletePersistentGroup.invoke(manager, channel, netid, null);
+			}
+		} catch (NoSuchMethodException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalAccessException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IllegalArgumentException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InvocationTargetException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
     }
 }

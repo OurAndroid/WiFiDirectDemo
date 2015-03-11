@@ -69,11 +69,11 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
 
         mContentView = inflater.inflate(R.layout.device_detail, null);
         mContentView.findViewById(R.id.btn_connect).setOnClickListener(new View.OnClickListener() {
-        //����˸��豸֮����ʾ�豸����ϸ��Ϣ����������ʾ������Ͽ����ӵ�����
+        //点击连接按钮开始连接
             @Override
             public void onClick(View v) {
                 WifiP2pConfig config = new WifiP2pConfig();
-                config.deviceAddress = device.deviceAddress;     //这里可能有问题
+                config.deviceAddress = device.deviceAddress;     //这里可能有问题，设备的mac地址
                 config.wps.setup = WpsInfo.PBC;
                 if (progressDialog != null && progressDialog.isShowing()) {
                     progressDialog.dismiss();
@@ -109,7 +109,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                     public void onClick(View v) {
                         // Allow user to pick an image from Gallery or other
                         // registered apps
-						//�����ļ��������������ļ���
+						
                         /*Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
                         intent.setType("image/*");   //�����ļ���������ͼƬ
                         startActivityForResult(intent, CHOOSE_FILE_RESULT_CODE);*/
@@ -155,7 +155,9 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         getActivity().startService(serviceIntent); 
         }
     }
-    // �����豸��
+    /*
+     * 连接成功后调用(non-Javadoc)
+     */
     @Override
     public void onConnectionInfoAvailable(final WifiP2pInfo info) {
         if (progressDialog != null && progressDialog.isShowing()) {
@@ -177,15 +179,21 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         // After the group negotiation, we assign the group owner as the file
         // server. The file server is single threaded, single connection server
         // socket.
-        /*if (info.groupFormed && info.isGroupOwner) {
-            new FileServerAsyncTask(getActivity(), mContentView.findViewById(R.id.status_text))
-                    .execute();
-        } else if (info.groupFormed) {        }*/
+        /**
+         * 为GroupOwner显示接收按钮，为组员显示发送按钮
+         */
+        if (info.groupFormed && info.isGroupOwner) {
+           // new FileServerAsyncTask(getActivity(), mContentView.findViewById(R.id.status_text))
+             //       .execute();
+        	
+        	mContentView.findViewById(R.id.btn_start_server).setVisibility(View.VISIBLE);
+        } else if (info.groupFormed) {     
+        mContentView.findViewById(R.id.btn_start_client).setVisibility(View.VISIBLE);
+        ((TextView) mContentView.findViewById(R.id.status_text)).setText(getResources()
+                .getString(R.string.client_text));     }
             // The other device acts as the client. In this case, we enable the
             // get file button.
-            mContentView.findViewById(R.id.btn_start_client).setVisibility(View.VISIBLE);
-            ((TextView) mContentView.findViewById(R.id.status_text)).setText(getResources()
-                    .getString(R.string.client_text));
+          
 
 
         // hide the connect button
