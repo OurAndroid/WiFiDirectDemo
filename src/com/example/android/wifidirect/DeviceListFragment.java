@@ -90,7 +90,9 @@ public class DeviceListFragment extends ListFragment implements PeerListListener
     /**
      * Initiate a connection with the peer.
      */
-	//单击ListView中的一项，显示详情
+	/**
+	 * 单击ListView中的一项，显示详情      调用回调接口 具体实现在activity中
+	 */
     @Override
     public void onListItemClick(ListView l, View v, int position, long id) {
         WifiP2pDevice device = (WifiP2pDevice) getListAdapter().getItem(position);
@@ -196,6 +198,7 @@ public class DeviceListFragment extends ListFragment implements PeerListListener
     }
 
     /**
+     * 回调接口  具体在activity中实现
      * An interface-callback for the activity to listen to fragment interaction
      * events.
      */

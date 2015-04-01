@@ -189,6 +189,7 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
     	//删除已经存在的分组信息
     	removeAndDeleteGroup();
     	//创建group组
+    	/**
     	manager.createGroup(channel, new ActionListener(){
 
 			@Override
@@ -204,6 +205,7 @@ public class WiFiDirectActivity extends Activity implements ChannelListener, Dev
 			}
     		
     	});
+    	*/
         manager.connect(channel, config, new ActionListener() {
 
             @Override

@@ -14,6 +14,12 @@
  * limitations under the License.
  */
 
+/**
+ * 在连接成功后调用SendTestMessage，找到非group owner的IP
+ * 主要思路是Group owner创建为socket server ， 另一台为socket client，
+ * 发送一个数据包，然后服务器端从数据包中获取client的IP地址
+ */
+
 package com.example.android.wifidirect;
 
 import android.app.Activity;
@@ -37,13 +43,16 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
+import com.example.android.utils.Utils;
 import com.example.android.wifidirect.DeviceListFragment.DeviceActionListener;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.ObjectInputStream;
 import java.io.OutputStream;
+import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 
@@ -53,11 +62,15 @@ import java.net.Socket;
  */
 public class DeviceDetailFragment extends Fragment implements ConnectionInfoListener {
 
+	public static final String IP_SERVER = "192.168.49.1";
     protected static final int CHOOSE_FILE_RESULT_CODE = 20;
     private View mContentView = null;
     private WifiP2pDevice device;
     private WifiP2pInfo info;
     ProgressDialog progressDialog = null;
+    private static String clientIP = null ;
+    
+    private static byte[] ipAddr = null;
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
@@ -88,7 +101,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
 //                            }
 //                        }
                         );
-                ((DeviceActionListener) getActivity()).connect(config);
+                ((DeviceActionListener) getActivity()).connect(config);           
 
             }
         });
@@ -124,7 +137,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
 			@Override 
 			public void onClick(View v){
 				new FileServerAsyncTask(getActivity(), mContentView.findViewById(R.id.status_text))
-                    .execute();		
+                    .executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);		
 			
 			}
 		}
@@ -140,6 +153,13 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         // FileTransferService.
     	super.onActivityResult(requestCode, resultCode, data);
         //Uri uri = data.getData();
+    	// 找到本地IP
+		/*String localIP = Utils.getLocalIPAddress();
+		// Trick to find the ip in the file /proc/net/arp
+		String client_mac_fixed = new String(device.deviceAddress).replace("99", "19");
+		String clientIP = Utils.getIPFromMac(client_mac_fixed);*/
+		Log.d(WiFiDirectActivity.TAG, "client IP " +clientIP);
+    	
         if(requestCode == CHOOSE_FILE_RESULT_CODE && resultCode == Activity.RESULT_OK ){
         	String val = data.getExtras().getString("EXTRAS_FILE_PATH");	
        
@@ -149,8 +169,13 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         Intent serviceIntent = new Intent(getActivity(), FileTransferService.class);
         serviceIntent.setAction(FileTransferService.ACTION_SEND_FILE);
         serviceIntent.putExtra(FileTransferService.EXTRAS_FILE_PATH, val);  //uri.toString() putExtra���������ݲ����ģ�putExtra("A",B)�У���һ������Ϊ�������ڶ�������Ϊ�����õ�ֵ��
-        serviceIntent.putExtra(FileTransferService.EXTRAS_GROUP_OWNER_ADDRESS,
-                info.groupOwnerAddress.getHostAddress());
+        /*serviceIntent.putExtra(FileTransferService.EXTRAS_GROUP_OWNER_ADDRESS,
+                info.groupOwnerAddress.getHostAddress());*/
+		if(clientIP.equals(IP_SERVER)){
+			serviceIntent.putExtra(FileTransferService.EXTRAS_ADDRESS, IP_SERVER);
+		}else{
+			serviceIntent.putExtra(FileTransferService.EXTRAS_ADDRESS, clientIP);
+		}        
         serviceIntent.putExtra(FileTransferService.EXTRAS_GROUP_OWNER_PORT, 8988);
         getActivity().startService(serviceIntent); 
         }
@@ -165,7 +190,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         }
         this.info = info;
         this.getView().setVisibility(View.VISIBLE);
-
+        mContentView.findViewById(R.id.btn_start_client).setVisibility(View.VISIBLE);
         // The owner IP is now known.
         TextView view = (TextView) mContentView.findViewById(R.id.group_owner);
         view.setText(getResources().getString(R.string.group_owner_text)
@@ -182,7 +207,29 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         /**
          * 为GroupOwner显示接收按钮，为组员显示发送按钮
          */
-        if (info.groupFormed && info.isGroupOwner) {
+      //判断自己是不是GroupOwner,如果是GroupOwner则打开一个ServerSocket
+        if (info.groupFormed && info.isGroupOwner){
+        	
+        	try {
+        		//获取客户端IP
+        		new SendMsgTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+        		
+			} catch (Exception e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+        } 
+        //如果不是GroupOwner，则打开Client Socket，并发送一个包
+        else {
+        	
+        	Log.d(WiFiDirectActivity.TAG, "unOwner");
+        	 Intent serviceIntent = new Intent(getActivity(), SendTestMessage.class);
+        	 serviceIntent.setAction("sendTestMessage");
+        	//Thread.sleep(10); //延时一段时间，等待服务器开启
+        	 getActivity().stopService(serviceIntent);
+			getActivity().startService(serviceIntent);
+        }
+        /*if (info.groupFormed && info.isGroupOwner) {
            // new FileServerAsyncTask(getActivity(), mContentView.findViewById(R.id.status_text))
              //       .execute();
         	
@@ -190,7 +237,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         } else if (info.groupFormed) {     
         mContentView.findViewById(R.id.btn_start_client).setVisibility(View.VISIBLE);
         ((TextView) mContentView.findViewById(R.id.status_text)).setText(getResources()
-                .getString(R.string.client_text));     }
+                .getString(R.string.client_text));     }*/
             // The other device acts as the client. In this case, we enable the
             // get file button.
           
@@ -279,6 +326,9 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
                 return null;
             }
         }
+        
+        
+       
 
         /*
          * (non-Javadoc)
@@ -306,7 +356,77 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         }
 
     }
+    
+    
+ public static class SendMsgTask extends AsyncTask<Void,Void,InetAddress>{
 
+	 
+	      final private int mPort = 8800;
+			@SuppressWarnings("resource")
+			@Override
+			protected InetAddress doInBackground(Void... params) {
+				ServerSocket serverSocket;
+			
+				Socket client = new Socket() ;
+				//ObjectInputStream objectInputStream = new ObjectInputStream();
+				try {
+					Log.d(WiFiDirectActivity.TAG, "doInback_startServer");
+					serverSocket = new ServerSocket(mPort);
+					serverSocket.setReuseAddress(true);
+					client = serverSocket.accept();
+					ObjectInputStream objectInputStream = new ObjectInputStream(client.getInputStream());
+					Object object = objectInputStream.readObject();
+					
+					if (object.getClass().equals(String.class) && ((String) object).equals("BROFIST")) {
+					  Log.d(WiFiDirectActivity.TAG, "Client IP address: "+client.getInetAddress().toString());
+					}
+					objectInputStream.close();
+					
+					serverSocket.close();	
+				} catch (Exception e) {
+					// TODO: handle exception
+					e.printStackTrace();
+				}finally {
+					try {
+						
+						if(!client.isClosed())
+						client.close();
+					} catch (IOException e) {
+						// TODO Auto-generated catch block
+						e.printStackTrace();
+					}
+							
+				}
+				return client.getInetAddress();
+				
+			}
+			
+			
+			
+			
+
+
+
+			@Override
+			protected void onPreExecute() {
+				Log.d(WiFiDirectActivity.TAG, "启动服务器Socket：");
+			}
+
+
+
+			@Override
+			protected void onPostExecute(InetAddress result) {
+				if(result!=null)
+				ipAddr = result.getAddress();
+				if (ipAddr != null)
+        			clientIP = Utils.getDottedDecimalIP(ipAddr);
+				Log.d(WiFiDirectActivity.TAG, "获取到ip为"+clientIP);
+			}
+        	
+        }
+ 
+ 
+ 
     public static boolean copyFile(InputStream inputStream, OutputStream out) {
         byte buf[] = new byte[1024];
         int len;
@@ -323,5 +443,7 @@ public class DeviceDetailFragment extends Fragment implements ConnectionInfoList
         }
         return true;
     }
+    
+    
 
 }
